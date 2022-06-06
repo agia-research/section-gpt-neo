@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import logging
 from multiprocessing import Pool, cpu_count
 from itertools import repeat
 import re
+import numpy as np
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
@@ -33,6 +35,14 @@ parser.add_argument("--chunk_size", type=int, default=2048, help="How big a chun
                                                                  "Should equal your model's context size")
 parser.add_argument("--write_dataset_config", action="store_true", help="Write the dataset config file on completion")
 parser.add_argument("--processes", type=int, default=0, help="Number of processes to use. Defaults to cpu count.")
+parser.add_argument("--arxiv_papers", action="store_true", help="Json file processor and vector avg for long documents")
+parser.add_argument("--add_abstract", action="store_true", help="Add paper abstract to text")
+parser.add_argument("--add_introduction", action="store_true", help="Add paper introduction to text")
+parser.add_argument("--abstract_tag", type=str, default=">Abstract:", help="Tag of abstract")
+parser.add_argument("--introduction_tag", type=str, default=">Introduction:", help="Tag of introduction")
+parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
+parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
+parser.add_argument("--pad_tag", type=str, default="<|pad|>", help="Tag of pad")
 
 args = parser.parse_args()
 if not args.output_dir.endswith("/"):
@@ -76,6 +86,68 @@ def wikitext_detokenizer(string):
     return string
 
 
+def call_clean_filters(text, args):
+    if args.ftfy:
+        text = ftfy.fix_text(text, normalization='NFKC')
+    if args.wikitext_detokenize:
+        text = wikitext_detokenizer(text)
+    return text
+
+
+def create_arxiv_doc(doc, args, encoder):
+    text = doc[0]
+    final_encoded = []
+    if doc[1] and text:
+        body_size = args.chunk_size
+        abstract = ''
+        introduction = ''
+        if args.add_abstract:
+            abstract = doc[1]['abstract']
+            abstract = call_clean_filters(abstract, args)
+            abstract_n = len(abstract)
+            body_size = body_size - abstract_n
+        if args.add_introduction:
+            introduction = doc[1]['introduction']
+            introduction = call_clean_filters(introduction, args)
+            introduction_n = len(introduction)
+            body_size = body_size - introduction_n
+        body_size = body_size - 4
+
+        text = call_clean_filters(text, args)
+
+        text_list = text.split() if text else []
+        chunk_size = math.ceil(len(text_list) / body_size)
+        if len(text_list) > 0 and chunk_size > 0:
+            text_arrays = np.array_split(text_list, chunk_size)
+            encoded_list = []
+            encoder.max_length = body_size
+            lowest_chunk_size = body_size
+            for tl in text_arrays:
+                if len(tl) < lowest_chunk_size:
+                    lowest_chunk_size = len(tl)
+            for tl in text_arrays:
+                body = " ".join(tl)
+                encoded_list.append(encoder.encode(body, max_length=lowest_chunk_size))
+            np_array = np.array(encoded_list)
+            avg = np.mean(np_array, axis=0, dtype=np.int32)
+
+            final_encoded = encoder.encode(args.start_tag) + avg.tolist()
+            if args.add_abstract:
+                final_encoded = final_encoded + encoder.encode(args.abstract_tag) + encoder.encode(abstract)
+            if args.add_introduction:
+                final_encoded = final_encoded + encoder.encode(args.introduction_tag) + encoder.encode(introduction)
+            encoded_pad = encoder.encode(args.pad_tag)
+            encoded_end = encoder.encode(args.end_tag) + args.separator
+
+            remainder = args.chunk_size - (len(final_encoded) + len(encoded_end))
+            while remainder > 0:
+                final_encoded = final_encoded + encoded_pad
+                remainder = remainder - len(encoded_pad)
+            final_encoded=final_encoded[:args.chunk_size-len(encoded_end)-1]
+            final_encoded = final_encoded + encoded_end + args.separator
+    return final_encoded
+
+
 def _int64_feature(value):
     """
     Returns an int64_list from a bool / enum / int / uint.
@@ -110,12 +182,15 @@ def archive_to_tokens(f, encoder, args, prefix=[]):
     # Generator that yields the contents of the files in an archive
     # if data_to_prepend is not None, prepend data_to_prepend + a EOS separator to the encoded data
     reader = Reader(f)
-    for doc in reader.stream_data(threaded=False):
-        if args.ftfy:  # fix text with ftfy if specified
-            doc = ftfy.fix_text(doc, normalization='NFKC')
-        if args.wikitext_detokenize:
-            doc = wikitext_detokenizer(doc)
-        doc = encoder.encode(doc) + args.separator  # read document from lmd and append separator token
+    get_meta = False
+    if f.endswith(".jsonl"):
+        get_meta = True
+    for doc in reader.stream_data(threaded=False,get_meta=get_meta):
+        if args.arxiv_papers:
+            doc = create_arxiv_doc(doc, args, encoder)
+        else:
+            doc = call_clean_filters(doc, args)
+            doc = encoder.encode(doc) + args.separator  # read document from lmd and append separator token
         yield split_list(prefix + doc, args.chunk_size)  # split into n_ctx + 1 size chunks
         prefix = []
 
@@ -127,7 +202,7 @@ def write_files(files, files_per, output_dir, out_name, start_no, write_remainde
     chunks = split_list(files, files_per)
     if not chunks:
         return
-      
+
     if len(chunks[-1]) != files_per and not write_remainder:  # pop the last file if it's length != files per
         remainder = chunks.pop(-1)
     else:
@@ -150,7 +225,7 @@ def write_files(files, files_per, output_dir, out_name, start_no, write_remainde
 def get_files(input_dir, filetypes=None):
     # gets all files of <filetypes> in input_dir
     if filetypes == None:
-        filetypes = ["jsonl.zst", ".txt", ".xz", ".tar.gz"]
+        filetypes = ["jsonl.zst", ".txt", ".xz", ".tar.gz", ".jsonl"]
     files = [list(Path(input_dir).glob(f"*{ft}")) for ft in filetypes]
     # flatten list of list -> list and stringify Paths
     flattened_list = [str(item) for sublist in files for item in sublist]
@@ -197,13 +272,14 @@ def create_tfrecords(params, write_remainder=True, write_every_n_files=1, save_c
 
             # if the last chunk < chunk size, but > minimum_size, take it and append it to the beginning of the next file
             data_to_prepend = []
-            n_tokens = len(tokenized_files[-1])
-            if n_tokens < args.chunk_size:
-                data = tokenized_files.pop(-1)
-                if n_tokens >= args.minimum_size:
-                    data_to_prepend = data
-                else:
-                    discarded_files += 1
+            if len(tokenized_files) > 1:
+                n_tokens = len(tokenized_files[-1])
+                if n_tokens < args.chunk_size:
+                    data = tokenized_files.pop(-1)
+                    if n_tokens >= args.minimum_size:
+                        data_to_prepend = data
+                    else:
+                        discarded_files += 1
 
             # add tokenized files > chunk size to main array
             tokenized_files_array.extend(tokenized_files)
