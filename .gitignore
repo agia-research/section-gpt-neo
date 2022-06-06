@@ -111,6 +111,7 @@ logs/
 test_*
 test/
 .vscode
+.idea
 
 
 run_configs/
