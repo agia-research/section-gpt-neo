@@ -337,6 +337,10 @@ if __name__ == "__main__":
 
     if args.processes == 0:
         args.processes = cpu_count()
+
+    print("\n==================== Args ====================\n")
+    print('\n'.join(f'  {"{:<20}".format(k)} = {v}' for k, v in vars(args).items()))
+    print("\n===============================================\n")
     if args.processes > 1:
         results = create_tfrecords_mp(files, args)
     else:
