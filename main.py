@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument("--sacred_id", type=str, default="nosacred", help="Sacred run id.")
     parser.add_argument("--entmax_sampling", action="store_true", help="(experimental) use entmax sampling")
     parser.add_argument("--export", action="store_true", help="If set, will export the model.")
+    parser.add_argument("--predict_out_dir", type=str, default="./", help="Directory if saving prediction outputs.")
     args = parser.parse_args()
     assert args.model is not None, "Model must be set"
     return args
@@ -184,7 +185,7 @@ def main(args):
         predictions = estimator.predict(input_fn=pred_input_fn)
         logger.info("Predictions generated")
         enc = fetch_encoder(params)
-        handle_pred_output_fn(predictions, logger, enc, params, out_name=f"predictions_{args.sacred_id}_{current_step}")
+        handle_pred_output_fn(predictions, logger, enc, params, out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
         return
 
     def save_eval_results(task, eval_results):
@@ -238,7 +239,7 @@ def main(args):
                 logger.info("Running prediction...")
                 predictions = estimator.predict(input_fn=pred_input_fn)
                 enc = fetch_encoder(params)
-                handle_pred_output_fn(predictions, logger, enc, params, out_name=f"predictions_{args.sacred_id}_{current_step}")
+                handle_pred_output_fn(predictions, logger, enc, params, out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
 
             if params["eval_steps"] > 0:
                 run_eval()
