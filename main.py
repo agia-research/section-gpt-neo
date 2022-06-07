@@ -254,4 +254,7 @@ def main(args):
 if __name__ == "__main__":
     tf.disable_v2_behavior()
     args = parse_args()
+    print("\n==================== Args ====================\n")
+    print('\n'.join(f'  {"{:<20}".format(k)} = {v}' for k, v in vars(args).items()))
+    print("\n===============================================\n")
     main(args)
