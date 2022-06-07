@@ -137,12 +137,15 @@ def sequential_input(params, global_step=None, eval=False):
 
 
 def pred_input(params, logger, enc=None,
-               path_to_prompt=""):
+                  path_to_prompt="", prompt_text=""):
     unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
                "previously unexplored valley, in the Andes Mountains. Even more surprising to the " \
                "researchers was the fact that the unicorns spoke perfect English."
 
     text = unicorns if path_to_prompt == "" else open(path_to_prompt, "r").read()
+    if prompt_text and len(prompt_text) > 1:
+        text = prompt_text
+
     tokens = encode(enc, text)
 
     if len(tokens) > params["n_ctx"]:

@@ -7,7 +7,7 @@ from tensorflow.python.tpu import tpu_config, tpu_estimator
 from tensorflow_estimator.python.estimator import estimator as estimator_lib
 from utils import save_config, expand_attention_types_params, yes_or_no, remove_gs_or_filepath, setup_logging, \
     check_dataset
-from inputs import sequential_input, pred_input, handle_pred_output, mlm_sample_text, generic_text
+from inputs import sequential_input, pred_input, handle_pred_output, mlm_sample_text, generic_text, pred_input_v2
 from export import export_model
 from model_fns import model_fn
 from data.encoders import fetch_encoder
@@ -38,6 +38,9 @@ def parse_args():
     parser.add_argument("--prompt", type=str, help="path to .txt file containing a prompt for prediction. If empty, "
                                                    "defaults to unicorns.",
                         default="")
+    parser.add_argument("--prompt_text", type=str, help="prompt for prediction. If empty, "
+                                                   "defaults to unicorns.",
+                        default="")
     parser.add_argument("--check_dataset", action="store_true",
                         help="If set, outputs sample from the dataset and quits.")
     parser.add_argument("--sacred_id", type=str, default="nosacred", help="Sacred run id.")
@@ -61,7 +64,7 @@ def main(args):
         input_fn = sequential_input
     elif input_fn == "generic_text":
         input_fn = generic_text
-    pred_input_fn = pred_input
+    pred_input_fn = pred_input_v2
     handle_pred_output_fn = handle_pred_output
 
     # get current step
@@ -78,7 +81,7 @@ def main(args):
     # Fetch encoder per params
     encoder = fetch_encoder(params)
 
-    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt, logger=logger, enc=encoder)
+    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt,prompt_text=args.prompt_text, logger=logger, enc=encoder)
 
     # Sample from Dataset if check dataset flag is on
     if args.check_dataset:
