@@ -36,7 +36,7 @@ def get_arg_parser():
     parser.add_argument("--summary_tag", type=str, default=">Summary:", help="Tag of summary")
     parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
     parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
-    parser.add_argument("--pad_tag", type=str, default="<|pad|>", help="Tag of pad")
+    parser.add_argument("--pad_tag", type=str, default="pad", help="Tag of pad")
     parser.add_argument("--summary_size", type=int, default=1000, help="Number of words to allocate for summary")
 
 

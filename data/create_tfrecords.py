@@ -89,7 +89,16 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
     body_size = full_size
 
     body_size = body_size - summary_size
-    body_size = body_size - 4
+
+    encoded_start = encoder.encode(args.start_tag)
+    encoded_summary_tag = encoder.encode(summary_tag)
+    encoded_pad = encoder.encode(args.pad_tag)
+    encoded_end = encoder.encode(args.end_tag)
+    separator = args.separator
+
+    size_of_tags=len(encoded_start) + len(encoded_summary_tag) + len(encoded_end) + len(separator)
+
+    body_size = body_size - size_of_tags
 
     text = call_clean_filters(body, args_in)
 
@@ -110,8 +119,7 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
         np_array = np.array(encoded_list)
         avg = np.mean(np_array, axis=0, dtype=np.int32)
 
-        encoded_pad = encoder.encode(args.pad_tag)
-        encoded_end = encoder.encode(args.end_tag) + args.separator
+
 
         avg_list = avg.tolist()
         if len(avg_list) < body_size:
@@ -121,11 +129,11 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
                 remainder = remainder - len(encoded_pad)
 
         # start + avg_body
-        final_encoded = encoder.encode(args.start_tag) + avg_list
+        final_encoded = encoded_start + avg_list
 
         if summary:
             # ( <start> + avg_body) + summary_tag + summary
-            final_encoded = final_encoded + encoder.encode(summary_tag) + encoder.encode(summary,
+            final_encoded = final_encoded + encoded_summary_tag + encoder.encode(summary,
                                                                                          max_length=summary_size)
             remainder = full_size - (len(final_encoded) + len(encoded_end))
 
@@ -135,7 +143,7 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
                 remainder = remainder - len(encoded_pad)
             final_encoded = final_encoded[:full_size - len(encoded_end) - 1]
             # {[(start + avg_body) + summary_tag + summary] + pad + pad + pad} + <end> + separator
-            final_encoded = final_encoded + encoded_end + args.separator
+            final_encoded = final_encoded + encoded_end + separator
         else:
             # ( <start> + avg_body) + summary_tag
             final_encoded = final_encoded + encoder.encode(summary_tag)
