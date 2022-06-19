@@ -14,11 +14,11 @@ from itertools import repeat
 import re
 import numpy as np
 
-import argument_util
+from data.argument_util import get_arg_parser
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
-parser = argument_util.get_arg_parser()
+parser = get_arg_parser()
 
 args = parser.parse_args()
 if not args.output_dir.endswith("/"):
