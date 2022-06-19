@@ -14,8 +14,6 @@ from itertools import repeat
 import re
 import numpy as np
 
-import sys
-sys.path.append('../')
 import argument_util
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
