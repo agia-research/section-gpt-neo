@@ -38,11 +38,12 @@ parser.add_argument("--processes", type=int, default=0, help="Number of processe
 parser.add_argument("--arxiv_papers", action="store_true", help="Json file processor and vector avg for long documents")
 parser.add_argument("--add_abstract", action="store_true", help="Add paper abstract to text")
 parser.add_argument("--add_introduction", action="store_true", help="Add paper introduction to text")
-parser.add_argument("--abstract_tag", type=str, default=">Abstract:", help="Tag of abstract")
-parser.add_argument("--introduction_tag", type=str, default=">Introduction:", help="Tag of introduction")
+parser.add_argument("--summary_tag", type=str, default=">Summary:", help="Tag of summary")
 parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
 parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
 parser.add_argument("--pad_tag", type=str, default="<|pad|>", help="Tag of pad")
+parser.add_argument("--summary_size", type=int, default=1000, help="Number of words to allocate for summary")
+
 
 args = parser.parse_args()
 if not args.output_dir.endswith("/"):
@@ -98,53 +99,71 @@ def create_arxiv_doc(doc, args, encoder):
     text = doc[0]
     final_encoded = []
     if doc[1] and text:
-        body_size = args.chunk_size
-        abstract = ''
-        introduction = ''
+        summary = ''
         if args.add_abstract:
             abstract = doc[1]['abstract']
-            abstract = call_clean_filters(abstract, args)
-            abstract_n = len(abstract)
-            body_size = body_size - abstract_n
+            summary = call_clean_filters(abstract, args)
         if args.add_introduction:
             introduction = doc[1]['introduction']
-            introduction = call_clean_filters(introduction, args)
-            introduction_n = len(introduction)
-            body_size = body_size - introduction_n
-        body_size = body_size - 4
+            summary = call_clean_filters(introduction, args)
+        final_encoded = create_encoded_vector(args,args.chunk_size,args.summary_size,encoder,text,summary,args.summary_tag)
+    return final_encoded
 
-        text = call_clean_filters(text, args)
 
-        text_list = text.split() if text else []
-        chunk_size = math.ceil(len(text_list) / body_size)
-        if len(text_list) > 0 and chunk_size > 0:
-            text_arrays = np.array_split(text_list, chunk_size)
-            encoded_list = []
-            encoder.max_length = body_size
-            lowest_chunk_size = body_size
-            for tl in text_arrays:
-                if len(tl) < lowest_chunk_size:
-                    lowest_chunk_size = len(tl)
-            for tl in text_arrays:
-                body = " ".join(tl)
-                encoded_list.append(encoder.encode(body, max_length=lowest_chunk_size))
-            np_array = np.array(encoded_list)
-            avg = np.mean(np_array, axis=0, dtype=np.int32)
+def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summary, summary_tag):
+    body_size = full_size
 
-            final_encoded = encoder.encode(args.start_tag) + avg.tolist()
-            if args.add_abstract:
-                final_encoded = final_encoded + encoder.encode(args.abstract_tag) + encoder.encode(abstract)
-            if args.add_introduction:
-                final_encoded = final_encoded + encoder.encode(args.introduction_tag) + encoder.encode(introduction)
-            encoded_pad = encoder.encode(args.pad_tag)
-            encoded_end = encoder.encode(args.end_tag) + args.separator
+    body_size = body_size - summary_size
+    body_size = body_size - 4
 
-            remainder = args.chunk_size - (len(final_encoded) + len(encoded_end))
+    text = call_clean_filters(body, args_in)
+
+    text_list = text.split() if text else []
+    chunk_size = math.ceil(len(text_list) / body_size)
+    final_encoded = []
+    if len(text_list) > 0 and chunk_size > 0:
+        text_arrays = np.array_split(text_list, chunk_size)
+        encoded_list = []
+        encoder.max_length = body_size
+        lowest_chunk_size = body_size
+        for tl in text_arrays:
+            if len(tl) < lowest_chunk_size:
+                lowest_chunk_size = len(tl)
+        for tl in text_arrays:
+            body = " ".join(tl)
+            encoded_list.append(encoder.encode(body, max_length=lowest_chunk_size))
+        np_array = np.array(encoded_list)
+        avg = np.mean(np_array, axis=0, dtype=np.int32)
+
+        encoded_pad = encoder.encode(args.pad_tag)
+        encoded_end = encoder.encode(args.end_tag) + args.separator
+
+        avg_list = avg.tolist()
+        if len(avg_list) < body_size:
+            remainder = body_size - len(avg_list)
+            while remainder > 0:
+                avg_list = avg_list + encoded_pad
+                remainder = remainder - len(encoded_pad)
+
+        # start + avg_body
+        final_encoded = encoder.encode(args.start_tag) + avg_list
+
+        if summary:
+            # ( <start> + avg_body) + summary_tag + summary
+            final_encoded = final_encoded + encoder.encode(summary_tag) + encoder.encode(summary,
+                                                                                         max_length=summary_size)
+            remainder = full_size - (len(final_encoded) + len(encoded_end))
+
+            # [(start + avg_body) + summary_tag + summary] + pad + pad + pad..
             while remainder > 0:
                 final_encoded = final_encoded + encoded_pad
                 remainder = remainder - len(encoded_pad)
-            final_encoded=final_encoded[:args.chunk_size-len(encoded_end)-1]
+            final_encoded = final_encoded[:full_size - len(encoded_end) - 1]
+            # {[(start + avg_body) + summary_tag + summary] + pad + pad + pad} + <end> + separator
             final_encoded = final_encoded + encoded_end + args.separator
+        else:
+            # ( <start> + avg_body) + summary_tag
+            final_encoded = final_encoded + encoder.encode(summary_tag)
     return final_encoded
 
 

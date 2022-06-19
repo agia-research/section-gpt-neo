@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 from functools import partial
+
+from data.create_tfrecords import create_encoded_vector
 from data.encoders import encode
 import random
 import re
@@ -146,8 +148,8 @@ def pred_input(params, logger, enc=None,
     if prompt_text and len(prompt_text) > 1:
         text = prompt_text
 
-    tokens = encode(enc, text)
-
+    # tokens = encode(enc, text)
+    tokens = create_encoded_vector(params, params.chunk_size, params.summary_size, enc, text, None, params.summary_tag)
     if len(tokens) > params["n_ctx"]:
         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
         tokens = tokens[len(tokens) - params["n_ctx"]:]

@@ -47,6 +47,15 @@ def parse_args():
     parser.add_argument("--entmax_sampling", action="store_true", help="(experimental) use entmax sampling")
     parser.add_argument("--export", action="store_true", help="If set, will export the model.")
     parser.add_argument("--predict_out_dir", type=str, default="./", help="Directory if saving prediction outputs.")
+    parser.add_argument("--chunk_size", type=int, default=2048, help="How big a chunk should be in chunk mode. "
+                                                                     "Should equal your model's context size")
+    parser.add_argument("--summary_tag", type=str, default=">Summary:", help="Tag of summary")
+    parser.add_argument("--summary_tag", type=str, default=">Summary:", help="Tag of summary")
+    parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
+    parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
+    parser.add_argument("--pad_tag", type=str, default="<|pad|>", help="Tag of pad")
+    parser.add_argument("--summary_size", type=int, default=1000, help="Number of words to allocate for summary")
+
     args = parser.parse_args()
     assert args.model is not None, "Model must be set"
     return args

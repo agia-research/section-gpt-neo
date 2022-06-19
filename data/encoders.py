@@ -26,3 +26,10 @@ def encode(encoder, text):
     if isinstance(result, list):
         return result
     return result.ids
+
+# Prediction text encoding
+# def encodeIgnoreSize(encoder, text, text_limit):
+#     result = encoder.encode(text, max_length=text_limit)
+#     if isinstance(result, list):
+#         return result
+#     return result.ids
