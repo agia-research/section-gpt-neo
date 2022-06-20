@@ -33,7 +33,7 @@ def get_arg_parser():
     parser.add_argument("--predict_out_dir", type=str, default="./", help="Directory if saving prediction outputs.")
     parser.add_argument("--chunk_size", type=int, default=2048, help="How big a chunk should be in chunk mode. "
                                                                      "Should equal your model's context size")
-    parser.add_argument("--summary_tag", type=str, default=">Summary:", help="Tag of summary")
+    parser.add_argument("--summary_tag", type=str, default=">Abstract:", help="Tag of summary")
     parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
     parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
     parser.add_argument("--pad_tag", type=str, default="pad", help="Tag of pad")
