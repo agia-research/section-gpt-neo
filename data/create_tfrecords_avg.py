@@ -14,7 +14,10 @@ from itertools import repeat
 import re
 import numpy as np
 
-from data.argument_util import get_arg_parser
+# import sys, os
+# sys.path.append(os.path.abspath(os.path.join('..','util')))
+
+from argument_util import get_arg_parser
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
