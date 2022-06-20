@@ -14,7 +14,7 @@ from itertools import repeat
 import re
 import numpy as np
 
-from data.argument_util import get_arg_parser
+from argument_util import get_arg_parser
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
