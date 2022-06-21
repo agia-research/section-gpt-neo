@@ -84,7 +84,8 @@ def create_arxiv_doc(doc, args, encoder):
         if args.add_introduction:
             introduction = doc[1]['introduction']
             summary = call_clean_filters(introduction, args)
-        final_encoded = create_encoded_vector(args,args.chunk_size,args.summary_size,encoder,text,summary,args.summary_tag)
+        final_encoded = create_encoded_vector(args, args.chunk_size, args.summary_size, encoder, text, summary,
+                                              args.summary_tag)
     return final_encoded
 
 
@@ -150,7 +151,8 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
         else:
             # ( <start> + avg_body) + summary_tag
             final_encoded = final_encoded + encoder.encode(summary_tag)
-    return final_encoded
+    if len(final_encoded) == full_size:
+        return final_encoded
 
 
 def _int64_feature(value):
