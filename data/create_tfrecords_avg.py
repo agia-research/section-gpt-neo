@@ -77,16 +77,70 @@ def create_arxiv_doc(doc, args, encoder):
     text = doc[0]
     final_encoded = []
     if doc[1] and text:
-        summary = ''
+        body_size = args.chunk_size
+        abstract = ''
+        introduction = ''
         if args.add_abstract:
             abstract = doc[1]['abstract']
-            summary = call_clean_filters(abstract, args)
+            abstract = call_clean_filters(abstract, args)
+            abstract_n = len(abstract)
+            body_size = body_size - abstract_n
         if args.add_introduction:
             introduction = doc[1]['introduction']
-            summary = call_clean_filters(introduction, args)
-        final_encoded = create_encoded_vector(args, args.chunk_size, args.summary_size, encoder, text, summary,
-                                              args.summary_tag)
+            introduction = call_clean_filters(introduction, args)
+            introduction_n = len(introduction)
+            body_size = body_size - introduction_n
+        body_size = body_size - 4
+
+        text = call_clean_filters(text, args)
+
+        text_list = text.split() if text else []
+        chunk_size = math.ceil(len(text_list) / body_size)
+        if len(text_list) > 0 and chunk_size > 0:
+            text_arrays = np.array_split(text_list, chunk_size)
+            encoded_list = []
+            encoder.max_length = body_size
+            lowest_chunk_size = body_size
+            for tl in text_arrays:
+                if len(tl) < lowest_chunk_size:
+                    lowest_chunk_size = len(tl)
+            for tl in text_arrays:
+                body = " ".join(tl)
+                encoded_list.append(encoder.encode(body, max_length=lowest_chunk_size))
+            np_array = np.array(encoded_list)
+            avg = np.mean(np_array, axis=0, dtype=np.int32)
+
+            final_encoded = encoder.encode(args.start_tag) + avg.tolist()
+            if args.add_abstract:
+                final_encoded = final_encoded + encoder.encode(args.abstract_tag) + encoder.encode(abstract)
+            if args.add_introduction:
+                final_encoded = final_encoded + encoder.encode(args.introduction_tag) + encoder.encode(introduction)
+            encoded_pad = encoder.encode(args.pad_tag)
+            encoded_end = encoder.encode(args.end_tag) + args.separator
+
+            remainder = args.chunk_size - (len(final_encoded) + len(encoded_end))
+            while remainder > 0:
+                final_encoded = final_encoded + encoded_pad
+                remainder = remainder - len(encoded_pad)
+            final_encoded=final_encoded[:args.chunk_size-len(encoded_end)-1]
+            final_encoded = final_encoded + encoded_end + args.separator
     return final_encoded
+
+
+# def create_arxiv_doc(doc, args, encoder):
+#     text = doc[0]
+#     final_encoded = []
+#     if doc[1] and text:
+#         summary = ''
+#         if args.add_abstract:
+#             abstract = doc[1]['abstract']
+#             summary = call_clean_filters(abstract, args)
+#         if args.add_introduction:
+#             introduction = doc[1]['introduction']
+#             summary = call_clean_filters(introduction, args)
+#         final_encoded = create_encoded_vector(args, args.chunk_size, args.summary_size, encoder, text, summary,
+#                                               args.summary_tag)
+#     return final_encoded
 
 
 def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summary, summary_tag):
