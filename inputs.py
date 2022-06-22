@@ -35,6 +35,7 @@ def _get_skip_index(all_files, n_batches):
     prev_cumsum = 0
     cumsum = 0
     global_n_documents = None
+    skip_idx, remainder = 0, 0
     for count, f in cycle(enumerate(all_files)):
         prev_cumsum = cumsum
         if _get_number_of_documents(f) is not None:
