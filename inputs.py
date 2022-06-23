@@ -139,32 +139,6 @@ def sequential_input(params, global_step=None, eval=False):
     return dataset.repeat()
 
 
-# def pred_input(params, logger, enc=None,
-#                   path_to_prompt="", prompt_text=""):
-#     unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
-#                "previously unexplored valley, in the Andes Mountains. Even more surprising to the " \
-#                "researchers was the fact that the unicorns spoke perfect English."
-#
-#     text = unicorns if path_to_prompt == "" else open(path_to_prompt, "r").read()
-#     if prompt_text and len(prompt_text) > 1:
-#         text = prompt_text
-#
-#     # tokens = encode(enc, text)
-#     tokens = create_encoded_vector(params, params.chunk_size, params.summary_size, enc, text, None, params.summary_tag)
-#     if len(tokens) > params["n_ctx"]:
-#         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
-#         tokens = tokens[len(tokens) - params["n_ctx"]:]
-#     if len(tokens) < params["n_ctx"]:
-#         tokens = tf.pad(tokens, [[0, params["n_ctx"] - len(tokens)]], constant_values=params["padding_id"])
-#     t = tf.broadcast_to(tokens, [params["batch_size"], params["n_ctx"]])
-#     dataset = tf.data.Dataset.from_tensors(t)
-#
-#     def _dummy_labels(x):
-#         return x, x
-#
-#     dataset = dataset.map(_dummy_labels)
-#     return dataset
-
 def pred_input(params, logger, enc=None,
                   path_to_prompt="", prompt_text=""):
     unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
@@ -175,8 +149,8 @@ def pred_input(params, logger, enc=None,
     if prompt_text and len(prompt_text) > 1:
         text = prompt_text
 
-    tokens = encode(enc, text)
-
+    # tokens = encode(enc, text)
+    tokens = create_encoded_vector(params, params.chunk_size, params.summary_size, enc, text, None, params.summary_tag)
     if len(tokens) > params["n_ctx"]:
         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
         tokens = tokens[len(tokens) - params["n_ctx"]:]
@@ -190,6 +164,32 @@ def pred_input(params, logger, enc=None,
 
     dataset = dataset.map(_dummy_labels)
     return dataset
+
+# def pred_input(params, logger, enc=None,
+#                   path_to_prompt="", prompt_text=""):
+#     unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
+#                "previously unexplored valley, in the Andes Mountains. Even more surprising to the " \
+#                "researchers was the fact that the unicorns spoke perfect English."
+#
+#     text = unicorns if path_to_prompt == "" else open(path_to_prompt, "r").read()
+#     if prompt_text and len(prompt_text) > 1:
+#         text = prompt_text
+#
+#     tokens = encode(enc, text)
+#
+#     if len(tokens) > params["n_ctx"]:
+#         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
+#         tokens = tokens[len(tokens) - params["n_ctx"]:]
+#     if len(tokens) < params["n_ctx"]:
+#         tokens = tf.pad(tokens, [[0, params["n_ctx"] - len(tokens)]], constant_values=params["padding_id"])
+#     t = tf.broadcast_to(tokens, [params["batch_size"], params["n_ctx"]])
+#     dataset = tf.data.Dataset.from_tensors(t)
+#
+#     def _dummy_labels(x):
+#         return x, x
+#
+#     dataset = dataset.map(_dummy_labels)
+#     return dataset
 
 
 def handle_pred_output(predictions, logger, enc, params, out_name="test"):

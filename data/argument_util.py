@@ -37,7 +37,7 @@ def get_arg_parser():
     parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
     parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
     parser.add_argument("--pad_tag", type=str, default="pad", help="Tag of pad")
-    parser.add_argument("--summary_size", type=int, default=1000, help="Number of words to allocate for summary")
+    parser.add_argument("--summary_size", type=int, default=185, help="Number of words to allocate for summary")
 
 
     # from create_tfrecords.py
