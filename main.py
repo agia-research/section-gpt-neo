@@ -59,7 +59,7 @@ def main(args):
     # Fetch encoder per params
     encoder = fetch_encoder(params)
 
-    pred_input_fn = partial(pred_input_fn, params=params, path_to_prompt=args.prompt,prompt_text=args.prompt_text, logger=logger, enc=encoder)
+    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt,prompt_text=args.prompt_text, logger=logger, enc=encoder)
 
     # Sample from Dataset if check dataset flag is on
     if args.check_dataset:

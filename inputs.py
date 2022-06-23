@@ -150,7 +150,7 @@ def pred_input(params, logger, enc=None,
         text = prompt_text
 
     # tokens = encode(enc, text)
-    tokens = create_encoded_vector(params, params.chunk_size, params.summary_size, enc, text, None, params.summary_tag)
+    tokens = create_encoded_vector(None, None, None, enc, text, None, None)
     if len(tokens) > params["n_ctx"]:
         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
         tokens = tokens[len(tokens) - params["n_ctx"]:]

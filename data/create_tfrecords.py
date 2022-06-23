@@ -86,6 +86,16 @@ def create_arxiv_doc(doc, args, encoder):
 
 
 def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summary, summary_tag):
+    if args_in is None:
+        args_in = args
+
+    if full_size is None:
+        full_size = args_in.chunk_size
+    if summary_size is None:
+        summary_size = args_in.summary_size
+    if summary_tag is None:
+        summary_tag = args_in.summary_tag
+
     body_size = full_size
 
     body_size = body_size - summary_size
