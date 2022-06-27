@@ -180,7 +180,7 @@ def main(args):
         logger.info(f"Prediction data size: {len(pred_data)}")
 
         predicted_data = []
-        for i in range(len(pred_data)):
+        for i in range(min(len(pred_data),10)):
             o = {}
             logger.info(f"Processing index: {i}")
             args.prompt_text = pred_data[i]['text']
