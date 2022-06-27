@@ -140,14 +140,16 @@ def sequential_input(params, global_step=None, eval=False):
 
 
 def pred_input(params, logger, enc=None,
-                  path_to_prompt="", prompt_text=""):
+               path_to_prompt="", prompt_text=""):
     unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
                "previously unexplored valley, in the Andes Mountains. Even more surprising to the " \
                "researchers was the fact that the unicorns spoke perfect English."
 
-    text = unicorns if path_to_prompt == "" else open(path_to_prompt, "r").read()
+    text = unicorns
     if prompt_text and len(prompt_text) > 1:
         text = prompt_text
+    elif path_to_prompt and path_to_prompt != "":
+        text = open(path_to_prompt, "r").read()
 
     # tokens = encode(enc, text)
     tokens = create_encoded_vector(None, None, None, enc, text, None, None)
@@ -193,6 +195,7 @@ def pred_input(params, logger, enc=None,
 
 
 def handle_pred_output(predictions, logger, enc, params, out_name="test"):
+    text = ""
     with tf.gfile.Open(f"{out_name}.txt", "w") as f:
         for i, p in enumerate(predictions):
             p = p["outputs"]
@@ -213,7 +216,7 @@ def handle_pred_output(predictions, logger, enc, params, out_name="test"):
             logger.info("=" * 40 + " SAMPLE " + str(i) + " " + "=" * 40 + "\n")
             logger.info(text)
             logger.info("\n" + "=" * 80 + "\n")
-
+    return text
 
 ### DEPRECATED ###
 

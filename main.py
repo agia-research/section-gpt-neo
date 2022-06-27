@@ -17,6 +17,7 @@ from configs import fetch_model_params
 from tasks import task_descriptors
 import json
 import numpy
+import re
 
 
 def parse_args():
@@ -59,7 +60,7 @@ def main(args):
     # Fetch encoder per params
     encoder = fetch_encoder(params)
 
-    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt,prompt_text=args.prompt_text, logger=logger, enc=encoder)
+    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt, prompt_text=args.prompt_text, logger=logger, enc=encoder)
 
     # Sample from Dataset if check dataset flag is on
     if args.check_dataset:
@@ -157,12 +158,53 @@ def main(args):
         export_model(estimator, "export", params)
         return
 
+    def extract_abstract(predicted_text):
+        abstract = ""
+        pred_abstract_list = re.findall(r"Abstract:(.*?)=", predicted_text, re.A | re.M | re.S)
+        if len(pred_abstract_list) > 0:
+            abstract = pred_abstract_list[0]
+        return abstract
+
+    def write_predictions(file_name, data_list):
+        with open(file_name, 'w') as outfile:
+            for entry in data_list:
+                json.dump(entry, outfile)
+                outfile.write('\n')
+
     if args.predict:
         # Predict
-        predictions = estimator.predict(input_fn=pred_input_fn)
-        logger.info("Predictions generated")
-        enc = fetch_encoder(params)
-        handle_pred_output_fn(predictions, logger, enc, params, out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
+        pred_data = []
+        with open(args.prompt, 'r') as f:
+            for line in f:
+                pred_data.append(json.loads(line))
+        logger.info(f"Prediction data size: {len(pred_data)}")
+
+        predicted_data = []
+        for i in range(len(pred_data)):
+            o = {}
+            logger.info(f"Processing index: {i}")
+            args.prompt_text = pred_data[i]['text']
+            o["text"] = args.prompt_text
+            predictions = estimator.predict(input_fn=pred_input_fn)
+            logger.info(f"Predictions generated for index: {i}")
+            enc = fetch_encoder(params)
+            predicted_text = handle_pred_output_fn(predictions, logger, enc, params, out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
+            logger.info(f"Predicted text for index: {i}")
+            logger.info(predicted_text)
+
+            if pred_data[i]["meta"]["abstract"]:
+                o["abstract"] = pred_data[i]["meta"]["abstract"]
+
+            prediction = extract_abstract(predicted_text)
+            if prediction and prediction != "":
+                logger.info(f"Abstract extracted for index: {i}")
+                o["gen_abstract"] = prediction
+            else:
+                logger.info(f"Abstract was not extracted for index: {i}")
+            predicted_data.append(o)
+        out_file = args.predict_out_dir+"/predictions.jsonl"
+        logger.info(f"Writing predicted data into {out_file}")
+        write_predictions(out_file, predicted_data)
         return
 
     def save_eval_results(task, eval_results):
