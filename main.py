@@ -197,6 +197,7 @@ def main(args):
                     o["abstract"] = p["meta"]["abstract"]
 
                 prediction = extract_abstract(predicted_text)
+                o["gen_text"] = predicted_text
                 if prediction and prediction != "":
                     logger.info(f"Abstract extracted for index: {i}")
                     o["gen_abstract"] = prediction
