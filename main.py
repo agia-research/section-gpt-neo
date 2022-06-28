@@ -24,7 +24,6 @@ def parse_args():
     # Parse command line arguments
     parser = get_arg_parser()
 
-
     args = parser.parse_args()
     assert args.model is not None, "Model must be set"
     return args
@@ -56,11 +55,11 @@ def main(args):
         if args.check_dataset:
             check_dataset(input_fn, params)
 
-
     # Fetch encoder per params
     encoder = fetch_encoder(params)
 
-    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt, prompt_text=args.prompt_text, logger=logger, enc=encoder)
+    pred_input_fn = partial(pred_input_fn, path_to_prompt=args.prompt, prompt_text=args.prompt_text, logger=logger,
+                            enc=encoder)
 
     # Sample from Dataset if check dataset flag is on
     if args.check_dataset:
@@ -89,7 +88,7 @@ def main(args):
     assert len(params["attention_types"]) == params["n_layer"]  # Assert that the length of expanded list = num layers
     params["predict_batch_size"] = params.get("predict_batch_size", 1)  # Default to 1
     params["predict"] = args.predict
-    params['model'] = params.get("model", "GPT") # Default model selection to GPT since it's the only option for now
+    params['model'] = params.get("model", "GPT")  # Default model selection to GPT since it's the only option for now
     params["export"] = args.export
     # Set sampling parameters
     params["sampling_use_entmax"] = args.entmax_sampling
@@ -113,7 +112,8 @@ def main(args):
     if args.tpu == "colab":
         tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver() if params["use_tpu"] else None
     else:
-        tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(args.tpu) if params["use_tpu"] else None
+        tpu_cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(args.tpu) if params[
+            "use_tpu"] else None
 
     config = tpu_config.RunConfig(
         cluster=tpu_cluster_resolver,
@@ -173,36 +173,38 @@ def main(args):
 
     if args.predict:
         # Predict
+        logger.info(f"Loading data...")
         pred_data = []
+        predicted_data = []
+        i = 0
         with open(args.prompt, 'r') as f:
             for line in f:
+                p = json.loads(line)
                 pred_data.append(json.loads(line))
-        logger.info(f"Prediction data size: {len(pred_data)}")
+                o = {}
+                logger.info(f"Processing index: {i}")
+                args.prompt_text = p['text']
+                o["text"] = args.prompt_text
+                predictions = estimator.predict(input_fn=pred_input_fn)
+                logger.info(f"Predictions generated for index: {i}")
+                enc = fetch_encoder(params)
+                predicted_text = handle_pred_output_fn(predictions, logger, enc, params,
+                                                       out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
+                logger.info(f"Predicted text for index: {i}")
+                logger.info(predicted_text)
 
-        predicted_data = []
-        for i in range(min(len(pred_data),10)):
-            o = {}
-            logger.info(f"Processing index: {i}")
-            args.prompt_text = pred_data[i]['text']
-            o["text"] = args.prompt_text
-            predictions = estimator.predict(input_fn=pred_input_fn)
-            logger.info(f"Predictions generated for index: {i}")
-            enc = fetch_encoder(params)
-            predicted_text = handle_pred_output_fn(predictions, logger, enc, params, out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
-            logger.info(f"Predicted text for index: {i}")
-            logger.info(predicted_text)
+                if p["meta"]["abstract"]:
+                    o["abstract"] = p["meta"]["abstract"]
 
-            if pred_data[i]["meta"]["abstract"]:
-                o["abstract"] = pred_data[i]["meta"]["abstract"]
-
-            prediction = extract_abstract(predicted_text)
-            if prediction and prediction != "":
-                logger.info(f"Abstract extracted for index: {i}")
-                o["gen_abstract"] = prediction
-            else:
-                logger.info(f"Abstract was not extracted for index: {i}")
-            predicted_data.append(o)
-        out_file = args.predict_out_dir+"/predictions.jsonl"
+                prediction = extract_abstract(predicted_text)
+                if prediction and prediction != "":
+                    logger.info(f"Abstract extracted for index: {i}")
+                    o["gen_abstract"] = prediction
+                else:
+                    logger.info(f"Abstract was not extracted for index: {i}")
+                predicted_data.append(o)
+                i = i + 1
+        out_file = args.predict_out_dir + "/predictions.jsonl"
         logger.info(f"Writing predicted data into {out_file}")
         write_predictions(out_file, predicted_data)
         return
@@ -212,6 +214,7 @@ def main(args):
             if isinstance(x, numpy.generic):
                 return x.item()
             return x
+
         eval_results = {k: as_python(v) for k, v in eval_results.items()}
         with open(f'eval_{args.sacred_id}.jsonl', 'a') as fh:
             json.dump({'task': task, 'current_step': current_step, **eval_results}, fh)
@@ -220,8 +223,8 @@ def main(args):
     def run_eval():
         logger.info("Running evaluation...")
         eval_results = estimator.evaluate(
-                input_fn=partial(input_fn, eval=True),
-                steps=params["eval_steps"])
+            input_fn=partial(input_fn, eval=True),
+            steps=params["eval_steps"])
         logger.info(f"Eval results: {eval_results}")
         save_eval_results('validation', eval_results)
 
@@ -237,7 +240,7 @@ def main(args):
                 name=task)
             logger.info(f"Eval task '{task}' results: {eval_results}")
             save_eval_results(task, eval_results)
-    
+
     if args.eval:
         run_eval_tasks()
         if params["eval_steps"] > 0:
@@ -258,20 +261,22 @@ def main(args):
                 logger.info("Running prediction...")
                 predictions = estimator.predict(input_fn=pred_input_fn)
                 enc = fetch_encoder(params)
-                handle_pred_output_fn(predictions, logger, enc, params, out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
+                handle_pred_output_fn(predictions, logger, enc, params,
+                                      out_name=f"{args.predict_out_dir}/predictions_{args.sacred_id}_{current_step}")
 
             if params["eval_steps"] > 0:
                 run_eval()
 
             if eval_tasks:
                 run_eval_tasks()
-                
+
         return
     else:
         # Else, just train
         while current_step < params["train_steps"]:
             # Else, don't stop and restart
-            estimator.train(input_fn=partial(input_fn, global_step=current_step, eval=False), max_steps=params["train_steps"])
+            estimator.train(input_fn=partial(input_fn, global_step=current_step, eval=False),
+                            max_steps=params["train_steps"])
 
 
 if __name__ == "__main__":
