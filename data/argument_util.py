@@ -62,5 +62,5 @@ def get_arg_parser():
                         help="Json file processor and vector avg for long documents")
     parser.add_argument("--add_abstract", action="store_true", help="Add paper abstract to text")
     parser.add_argument("--add_introduction", action="store_true", help="Add paper introduction to text")
-    parser.add_argument("--prediction_regx", type=str, default=r"Abstract:(.*?)", help="")
+    parser.add_argument("--prediction_regx", type=str, default=r"Abstract:(.*?)endoftext", help="")
     return parser
