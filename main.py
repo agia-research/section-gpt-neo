@@ -6,7 +6,7 @@ import tensorflow.compat.v1 as tf
 from tensorflow.python.tpu import tpu_config, tpu_estimator
 from tensorflow_estimator.python.estimator import estimator as estimator_lib
 
-from data.argument_util import get_arg_parser
+from util.argument_util import get_arg_parser
 from utils import save_config, expand_attention_types_params, yes_or_no, remove_gs_or_filepath, setup_logging, \
     check_dataset
 from inputs import sequential_input, pred_input, handle_pred_output, mlm_sample_text, generic_text
@@ -160,7 +160,7 @@ def main(args):
 
     def extract_abstract(predicted_text):
         abstract = ""
-        pred_abstract_list = re.findall(r"Abstract:(.*?)=", predicted_text, re.A | re.M | re.S)
+        pred_abstract_list = re.findall(r"Abstract:(.*)", predicted_text, re.A | re.M | re.S)
         if len(pred_abstract_list) > 0:
             abstract = pred_abstract_list[0]
         return abstract

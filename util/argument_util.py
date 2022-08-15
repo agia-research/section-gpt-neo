@@ -38,6 +38,15 @@ def get_arg_parser():
     parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
     parser.add_argument("--pad_tag", type=str, default="pad", help="Tag of pad")
     parser.add_argument("--summary_size", type=int, default=185, help="Number of words to allocate for summary")
+    parser.add_argument("--body_shrink_method", type=str, default="extractive", help="extractive or vector_avg")
+    parser.add_argument("--body_shrink_extractive_method", type=str, default="lsa",
+                        help="text_rank,lex_rank,lsa,luhn,kl")
+    parser.add_argument("--body_shrink_extractive_initial_sentences", type=int, default=100,
+                        help="number of sentences to start fitting required words")
+    parser.add_argument("--body_shrink_extractive_offset", type=int, default=10,
+                        help="number of words allow less than required")
+
+
 
 
     # from create_tfrecords.py

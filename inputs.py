@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 from functools import partial
 
-from data.create_tfrecords import create_encoded_vector
+from create_tfrecords import create_encoded_vector
 from data.encoders import encode
 import random
 import re
