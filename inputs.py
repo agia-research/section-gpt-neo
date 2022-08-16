@@ -141,7 +141,7 @@ def sequential_input(params, global_step=None, eval=False):
     return dataset.repeat()
 
 
-def pred_input(params, logger, enc=None,
+def pred_input(args, params, logger, enc=None,
                path_to_prompt="", prompt_text=""):
     unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
                "previously unexplored valley, in the Andes Mountains. Even more surprising to the " \
@@ -153,7 +153,7 @@ def pred_input(params, logger, enc=None,
     elif path_to_prompt and path_to_prompt != "":
         text = open(path_to_prompt, "r").read()
 
-    body_shrink_method = get_shrink_class(params, logger)
+    body_shrink_method = get_shrink_class(args, logger)
 
     # tokens = encode(enc, text)
     tokens = create_encoded_vector(None, None, None, enc, text, None, None, body_shrink_method)
