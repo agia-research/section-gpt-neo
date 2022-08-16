@@ -41,6 +41,8 @@ def get_arg_parser():
     parser.add_argument("--body_shrink_method", type=str, default="extractive", help="extractive or vector_avg")
     parser.add_argument("--body_shrink_extractive_method", type=str, default="lsa",
                         help="text_rank,lex_rank,lsa,luhn,kl")
+    parser.add_argument("--body_shrink_extractive_optimize", type=bool, default=False,
+                        help="change number of sentences to utilize available portion in chunk")
     parser.add_argument("--body_shrink_extractive_initial_sentences", type=int, default=100,
                         help="number of sentences to start fitting required words")
     parser.add_argument("--body_shrink_extractive_offset", type=int, default=10,

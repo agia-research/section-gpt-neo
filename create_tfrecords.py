@@ -1,5 +1,6 @@
 import math
 import os
+import sys
 from pathlib import Path
 
 import ftfy
@@ -13,7 +14,12 @@ from multiprocessing import Pool, cpu_count
 from itertools import repeat
 import re
 import numpy as np
+import logging
+
 import nltk
+
+from utils import setup_logging
+
 nltk.download('punkt')
 
 from shrink.shrink_factory import get_shrink_class
@@ -73,7 +79,7 @@ def call_clean_filters(text, args):
     return text
 
 
-def create_arxiv_doc(doc, args, encoder):
+def create_arxiv_doc(doc, args, encoder, body_shrink_method):
     text = doc[0]
     final_encoded = []
     if doc[1] and text:
@@ -84,12 +90,13 @@ def create_arxiv_doc(doc, args, encoder):
         if args.add_introduction:
             introduction = doc[1]['introduction']
             summary = call_clean_filters(introduction, args)
+        body_shrink_method.meta["paper_id"] = doc[1]['paper_id']
         final_encoded = create_encoded_vector(args, args.chunk_size, args.summary_size, encoder, text, summary,
-                                              args.summary_tag)
+                                              args.summary_tag, body_shrink_method)
     return final_encoded
 
 
-def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summary, summary_tag):
+def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summary, summary_tag, body_shrink_method):
     if args_in is None:
         args_in = args
 
@@ -117,7 +124,7 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
     text = call_clean_filters(body, args_in)
 
     final_encoded = []
-    encoded_body = tokenize_text(args, text, body_size, encoder, args.pad_tag, encoded_pad)
+    encoded_body = body_shrink_method.tokenize(args, text, body_size, encoder, args.pad_tag, encoded_pad)
     if encoded_body:
 
         # start + avg_body
@@ -139,11 +146,11 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
         else:
             # ( <start> + avg_body) + summary_tag
             final_encoded = final_encoded + encoder.encode(summary_tag)
+        body_shrink_method.meta["processed_count"] = body_shrink_method.meta["processed_count"] + 1
+    else:
+        body_shrink_method.meta["failed_count"] = body_shrink_method.meta["failed_count"] + 1
+    body_shrink_method.logger.info(body_shrink_method.meta)
     return final_encoded
-
-
-def tokenize_text(args, text, body_size, encoder, pad, encoded_pad):
-    return get_shrink_class(args).tokenize(args, text, body_size, encoder, pad, encoded_pad)
 
 
 def _int64_feature(value):
@@ -176,16 +183,17 @@ def split_list(l, n):
     return [l[i:i + n] for i in range(0, len(l), n)]
 
 
-def archive_to_tokens(f, encoder, args, prefix=[]):
+def archive_to_tokens(f, encoder, args, body_shrink_method, prefix=[]):
     # Generator that yields the contents of the files in an archive
     # if data_to_prepend is not None, prepend data_to_prepend + a EOS separator to the encoded data
     reader = Reader(f)
     get_meta = False
     if f.endswith(".jsonl"):
         get_meta = True
+
     for doc in reader.stream_data(threaded=False, get_meta=get_meta):
         if args.arxiv_papers:
-            doc = create_arxiv_doc(doc, args, encoder)
+            doc = create_arxiv_doc(doc, args, encoder, body_shrink_method)
         else:
             doc = call_clean_filters(doc, args)
             doc = encoder.encode(doc) + args.separator  # read document from lmd and append separator token
@@ -249,6 +257,10 @@ def create_tfrecords(params, write_remainder=True, write_every_n_files=1, save_c
                      resume_from_checkpoint=False, display_pbar=False):
     # iterates through files in input_dir, splitting into <args.chunk_size> chunks and saving a tfrecords file every <args.files_per> chunks.
     files, args, process_no = params
+    logger = logging.getLogger("tfrecord_creator")
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.INFO)
+
     enc = get_tokenizer(args)  # get tokenizer
 
     # init metadata
@@ -262,8 +274,9 @@ def create_tfrecords(params, write_remainder=True, write_every_n_files=1, save_c
     data_to_prepend = []
     tokenized_files_array = []
 
+    body_shrink_method = get_shrink_class(args, logger)
     for f in files:
-        for tokenized_files in archive_to_tokens(f, enc, args, prefix=data_to_prepend):
+        for tokenized_files in archive_to_tokens(f, enc, args, body_shrink_method, prefix=data_to_prepend):
             files_processed += 1
             if files_processed < resume_files_processed:
                 continue  # resume from checkpoint

@@ -21,22 +21,30 @@ class ExtractiveShrink(ShrinkMethod):
 
     def tokenize(self, args, text, body_size, encoder, pad, encoded_pad):
         if text:
-            parser = PlaintextParser.from_string(text, Tokenizer('english'))
+            try:
+                parser = PlaintextParser.from_string(text, Tokenizer('english'))
 
-            sentences = self.summarize_for_max_words(parser, args.body_shrink_extractive_method, body_size,
-                                                     args.body_shrink_extractive_initial_sentences,
-                                                     args.body_shrink_extractive_offset,
-                                                     -1)
-            body = ''
-            for s in sentences:
-                body = " ".join(s.words)
-            encoded_text = encoder.encode(body, max_length=body_size)
-            if len(encoded_text) < body_size:
-                remainder = body_size - len(encoded_text)
-                while remainder > 0:
-                    encoded_text = encoded_text + encoded_pad
-                    remainder = remainder - len(encoded_pad)
-            return encoded_text
+                body_shrink_extractive_initial_sentences = args.body_shrink_extractive_offset
+                if self.meta and self.meta["body_shrink_extractive_last_sentences"] > 0:
+                    body_shrink_extractive_initial_sentences = self.meta["body_shrink_extractive_last_sentences"]
+
+                sentences = self.summarize_for_max_words(parser, args.body_shrink_extractive_method, body_size,
+                                                         args.body_shrink_extractive_initial_sentences,
+                                                         body_shrink_extractive_initial_sentences,
+                                                         -1, args.body_shrink_extractive_optimize)
+                body = ''
+                for s in sentences:
+                    body = " ".join(s.words)
+                encoded_text = encoder.encode(body, max_length=body_size)
+                if len(encoded_text) < body_size:
+                    remainder = body_size - len(encoded_text)
+                    while remainder > 0:
+                        encoded_text = encoded_text + encoded_pad
+                        remainder = remainder - len(encoded_pad)
+                return encoded_text
+            except BaseException as e:
+                self.logger.error(e)
+                return []
         else:
             return []
 
@@ -60,20 +68,38 @@ class ExtractiveShrink(ShrinkMethod):
         return summary_sentences
 
     def summarize_for_max_words(self, parser, method, max_words, num_of_sentences=100, offset=10,
-                                last_iteration_words_count=-1):
+                                last_iteration_words_count=-1, optimize = False):
         sentence_list = self.get_extractive_summary(parser, method, num_of_sentences)
-        words_count = get_sentence_list_word_count(sentence_list)
+        if optimize:
+            words_count = get_sentence_list_word_count(sentence_list)
 
-        if (words_count > max_words):
-            return self.summarize_for_max_words(parser, method, max_words, num_of_sentences - 1, offset, words_count)
+            # higher word count > reduce sentence size
+            if words_count > max_words:
+                return self.summarize_for_max_words(parser, method, max_words, num_of_sentences - 1, offset, words_count)
 
-        elif words_count + offset < max_words:
-            if last_iteration_words_count > max_words:
-                return sentence_list
-            elif last_iteration_words_count == words_count:
-                return sentence_list
+            # lower words counts
+            elif words_count + offset < max_words:
+                # last time it was higher than max > stop here
+                if last_iteration_words_count > max_words:
+                    self.setup_last_sentence_count(num_of_sentences)
+                    return sentence_list
+
+                # last time it was same words count :> text is over smaller > stop here
+                elif last_iteration_words_count == words_count:
+                    return sentence_list
+
+                # increase sentence size
+                else:
+                    return self.summarize_for_max_words(parser, method, max_words, num_of_sentences + 1, offset,
+                                                        words_count)
+
+            # less than max, withing offset
             else:
-                return self.summarize_for_max_words(parser, method, max_words, num_of_sentences + 1, offset,
-                                                    words_count)
+                self.setup_last_sentence_count(num_of_sentences)
+                return sentence_list
         else:
+            self.setup_last_sentence_count(num_of_sentences)
             return sentence_list
+
+    def setup_last_sentence_count(self, num_of_sentences):
+        self.meta["body_shrink_extractive_last_sentences"] = num_of_sentences
