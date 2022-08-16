@@ -8,6 +8,8 @@ import random
 import re
 import logging
 from itertools import cycle
+
+from shrink.shrink_factory import get_shrink_class
 from utils import natural_sort
 
 
@@ -151,8 +153,10 @@ def pred_input(params, logger, enc=None,
     elif path_to_prompt and path_to_prompt != "":
         text = open(path_to_prompt, "r").read()
 
+    body_shrink_method = get_shrink_class(params, logger)
+
     # tokens = encode(enc, text)
-    tokens = create_encoded_vector(None, None, None, enc, text, None, None)
+    tokens = create_encoded_vector(None, None, None, enc, text, None, None, body_shrink_method)
     if len(tokens) > params["n_ctx"]:
         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
         tokens = tokens[len(tokens) - params["n_ctx"]:]
