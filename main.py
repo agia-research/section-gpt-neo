@@ -185,7 +185,10 @@ def main(args):
                 logger.info(f"Processing index: {i}")
                 args.prompt_text = p['text']
                 o["text"] = args.prompt_text
-                predictions = estimator.predict(input_fn=pred_input_fn)
+                pred_input_fn_copy = partial(pred_input, args=args, path_to_prompt=args.prompt,
+                                        prompt_text=args.prompt_text, logger=logger,
+                                        enc=encoder)
+                predictions = estimator.predict(input_fn=pred_input_fn_copy)
                 logger.info(f"Predictions generated for index: {i}")
                 enc = fetch_encoder(params)
                 predicted_text = handle_pred_output_fn(predictions, logger, enc, params,
