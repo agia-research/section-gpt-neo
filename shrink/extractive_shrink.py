@@ -34,7 +34,7 @@ class ExtractiveShrink(ShrinkMethod):
                                                          -1, args.body_shrink_extractive_optimize)
                 body = ''
                 for s in sentences:
-                    body = " ".join(s.words)
+                    body += " ".join(s.words)
                 encoded_text = encoder.encode(body, max_length=body_size)
                 if len(encoded_text) < body_size:
                     remainder = body_size - len(encoded_text)
