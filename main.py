@@ -279,8 +279,12 @@ def main(args):
         # Else, just train
         while current_step < params["train_steps"]:
             # Else, don't stop and restart
-            estimator.train(input_fn=partial(input_fn, global_step=current_step, eval=False),
+            try:
+                estimator.train(input_fn=partial(input_fn, global_step=current_step, eval=False),
                             max_steps=params["train_steps"])
+            except:
+                logger.error("error occurred.")
+
 
 
 if __name__ == "__main__":
