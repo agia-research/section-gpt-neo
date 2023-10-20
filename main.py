@@ -6,6 +6,7 @@ import tensorflow.compat.v1 as tf
 from tensorflow.python.tpu import tpu_config, tpu_estimator
 from tensorflow_estimator.python.estimator import estimator as estimator_lib
 
+from create_tfrecords import get_sections
 from util.argument_util import get_arg_parser
 from utils import save_config, expand_attention_types_params, yes_or_no, remove_gs_or_filepath, setup_logging, \
     check_dataset
@@ -158,9 +159,9 @@ def main(args):
         export_model(estimator, "export", params)
         return
 
-    def extract_abstract(predicted_text):
+    def extract_summary(predicted_text):
         abstract = ""
-        pred_abstract_list = re.findall(r"Abstract:(.*)", predicted_text, re.A | re.M | re.S)
+        pred_abstract_list = re.findall(r"Summary:(.*)", predicted_text, re.A | re.M | re.S)
         if len(pred_abstract_list) > 0:
             abstract = pred_abstract_list[0]
         return abstract
@@ -183,10 +184,10 @@ def main(args):
                 pred_data.append(json.loads(line))
                 o = {}
                 logger.info(f"Processing index: {i}")
-                args.prompt_text = p['text']
-                o["text"] = args.prompt_text
+                summary, prompt_article = get_sections(args.summary_section, True, p)
+                o["text"] = str(prompt_article)
                 pred_input_fn_copy = partial(pred_input, args=args, path_to_prompt=args.prompt,
-                                        prompt_text=args.prompt_text, logger=logger,
+                                        prompt_text=prompt_article, logger=logger,
                                         enc=encoder)
                 predictions = estimator.predict(input_fn=pred_input_fn_copy)
                 logger.info(f"Predictions generated for index: {i}")
@@ -196,16 +197,16 @@ def main(args):
                 logger.info(f"Predicted text for index: {i}")
                 logger.info(predicted_text)
 
-                if p["meta"]["abstract"]:
-                    o["abstract"] = p["meta"]["abstract"]
+                if summary:
+                    o["summary"] = summary
 
-                prediction = extract_abstract(predicted_text)
+                prediction = extract_summary(predicted_text)
                 o["gen_text"] = predicted_text
                 if prediction and prediction != "":
-                    logger.info(f"Abstract extracted for index: {i}")
-                    o["gen_abstract"] = prediction
+                    logger.info(f"Summary extracted for index: {i}")
+                    o["gen_summary"] = prediction
                 else:
-                    logger.info(f"Abstract was not extracted for index: {i}")
+                    logger.info(f"Summary was not extracted for index: {i}")
                 predicted_data.append(o)
                 i = i + 1
         out_file = args.predict_out_dir + "/predictions.jsonl"

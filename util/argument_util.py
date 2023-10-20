@@ -33,7 +33,7 @@ def get_arg_parser():
     parser.add_argument("--predict_out_dir", type=str, default="./", help="Directory if saving prediction outputs.")
     parser.add_argument("--chunk_size", type=int, default=2048, help="How big a chunk should be in chunk mode. "
                                                                      "Should equal your model's context size")
-    parser.add_argument("--summary_tag", type=str, default=">Abstract:", help="Tag of summary")
+    parser.add_argument("--summary_tag", type=str, default=">Summary:", help="Tag of summary")
     parser.add_argument("--start_tag", type=str, default="<|startoftext|>Text:", help="Tag of start")
     parser.add_argument("--end_tag", type=str, default="<|endoftext|>", help="Tag of end")
     parser.add_argument("--pad_tag", type=str, default="pad", help="Tag of pad")
@@ -73,7 +73,7 @@ def get_arg_parser():
                         help="Json file processor and vector avg for long documents")
     parser.add_argument("--add_abstract", action="store_true", help="Add paper abstract to text")
     parser.add_argument("--add_introduction", action="store_true", help="Add paper introduction to text")
-    parser.add_argument("--prediction_regx", type=str, default=r"Abstract:(.*?)endoftext", help="")
+    parser.add_argument("--prediction_regx", type=str, default=r"Summary:(.*?)endoftext", help="")
     parser.add_argument("--relavance_matrix", type=str, default='''{"introdcution": 27,"related_work": 14,"methodology": 9,"experiments": 10,"results": 9,"discussion": 0,"conclusion": 30,"future_work": 0}''', help="")
     parser.add_argument("--summary_section", type=str, default="abstract", help="")
     parser.add_argument("--add_summary", type=bool, default=True, help="")

@@ -143,20 +143,15 @@ def sequential_input(params, global_step=None, eval=False):
 
 def pred_input(args, params, logger, enc=None,
                path_to_prompt="", prompt_text=""):
-    unicorns = "In a shocking finding, scientists discovered a herd of unicorns living in a remote, " \
-               "previously unexplored valley, in the Andes Mountains. Even more surprising to the " \
-               "researchers was the fact that the unicorns spoke perfect English."
-
-    text = unicorns
-    if prompt_text and len(prompt_text) > 1:
-        text = prompt_text
+    if prompt_text:
+        article = prompt_text
     elif path_to_prompt and path_to_prompt != "":
         text = open(path_to_prompt, "r").read()
 
     body_shrink_method = get_shrink_class(args, logger)
 
     # tokens = encode(enc, text)
-    tokens = create_encoded_vector(None, None, None, enc, text, None, None, body_shrink_method)
+    tokens = create_encoded_vector(None, None, None, enc, article, None, None, body_shrink_method)
     if len(tokens) > params["n_ctx"]:
         logger.info("The length of your input prompt is longer than the model's context length - truncating input.")
         tokens = tokens[len(tokens) - params["n_ctx"]:]
