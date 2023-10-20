@@ -74,4 +74,7 @@ def get_arg_parser():
     parser.add_argument("--add_abstract", action="store_true", help="Add paper abstract to text")
     parser.add_argument("--add_introduction", action="store_true", help="Add paper introduction to text")
     parser.add_argument("--prediction_regx", type=str, default=r"Abstract:(.*?)endoftext", help="")
+    parser.add_argument("--relavance_matrix", type=str, default='''{"introdcution": 27,"related_work": 14,"methodology": 9,"experiments": 10,"results": 9,"discussion": 0,"conclusion": 30,"future_work": 0}''', help="")
+    parser.add_argument("--summary_section", type=str, default="abstract", help="")
+    parser.add_argument("--add_summary", type=bool, default=True, help="")
     return parser

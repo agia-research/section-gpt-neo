@@ -1,11 +1,12 @@
-from sumy.summarizers.text_rank import TextRankSummarizer
+import json
+
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.summarizers.kl import KLSummarizer
 from sumy.summarizers.lex_rank import LexRankSummarizer
 from sumy.summarizers.lsa import LsaSummarizer
 from sumy.summarizers.luhn import LuhnSummarizer
-from sumy.summarizers.kl import KLSummarizer
-
-from sumy.parsers.plaintext import PlaintextParser
-from sumy.nlp.tokenizers import Tokenizer
+from sumy.summarizers.text_rank import TextRankSummarizer
 
 from shrink.shrink_method import ShrinkMethod
 
@@ -19,20 +20,30 @@ def get_sentence_list_word_count(sentence_list):
 
 class ExtractiveShrink(ShrinkMethod):
 
-    def tokenize(self, args, text, body_size, encoder, pad, encoded_pad):
-        if text:
+    def tokenize(self, args, article, body_size, encoder, pad, encoded_pad):
+        if article:
             try:
-                parser = PlaintextParser.from_string(text, Tokenizer('english'))
-
-                body_shrink_extractive_initial_sentences = args.body_shrink_extractive_offset
-                if self.meta and self.meta["body_shrink_extractive_last_sentences"] > 0:
-                    body_shrink_extractive_initial_sentences = self.meta["body_shrink_extractive_last_sentences"]
-
-                sentences = self.summarize_for_max_words(parser, args.body_shrink_extractive_method, body_size,
-                                                         args.body_shrink_extractive_initial_sentences,
-                                                         body_shrink_extractive_initial_sentences,
-                                                         -1, args.body_shrink_extractive_optimize)
+                rel_matrix = json.loads(args.relavance_matrix)
                 body = ''
+                sentences = []
+                not_adding = []
+                for key in article.keys():
+
+                    text = article[key]
+
+                    max_sentences = self.find_max_sentences(rel_matrix, key)
+                    if max_sentences:
+                        parser = PlaintextParser.from_string(text, Tokenizer('english'))
+                        sentences = sentences + list(self.get_extractive_summary(parser, args.body_shrink_extractive_method,
+                                                    max_sentences))
+                    else:
+                        not_adding.append(key)
+
+                if len(sentences) < 100 and len(not_adding) > 0:
+                    text = article[not_adding[0]]
+                    parser = PlaintextParser.from_string(text, Tokenizer('english'))
+                    sentences = sentences + list(self.get_extractive_summary(parser, args.body_shrink_extractive_method, 100 - len(sentences)))
+
                 for s in sentences:
                     body += " ".join(s.words)
                 encoded_text = encoder.encode(body, max_length=body_size)
@@ -68,14 +79,15 @@ class ExtractiveShrink(ShrinkMethod):
         return summary_sentences
 
     def summarize_for_max_words(self, parser, method, max_words, num_of_sentences=100, offset=10,
-                                last_iteration_words_count=-1, optimize = False):
+                                last_iteration_words_count=-1, optimize=False):
         sentence_list = self.get_extractive_summary(parser, method, num_of_sentences)
         if optimize:
             words_count = get_sentence_list_word_count(sentence_list)
 
             # higher word count > reduce sentence size
             if words_count > max_words:
-                return self.summarize_for_max_words(parser, method, max_words, num_of_sentences - 1, offset, words_count)
+                return self.summarize_for_max_words(parser, method, max_words, num_of_sentences - 1, offset,
+                                                    words_count)
 
             # lower words counts
             elif words_count + offset < max_words:
@@ -103,3 +115,9 @@ class ExtractiveShrink(ShrinkMethod):
 
     def setup_last_sentence_count(self, num_of_sentences):
         self.meta["body_shrink_extractive_last_sentences"] = num_of_sentences
+
+    def find_max_sentences(self, rel_matrix, key):
+        if key in rel_matrix:
+            return rel_matrix[key]
+        else:
+            return None

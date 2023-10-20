@@ -1,24 +1,19 @@
-import math
+import logging
 import os
+import re
 import sys
+from itertools import repeat
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
 import ftfy
-import tensorflow as tf
-from lm_dataformat import Reader
-from tokenizers import Tokenizer
-from transformers import GPT2TokenizerFast
-from tqdm import tqdm
-import logging
-from multiprocessing import Pool, cpu_count
-from itertools import repeat
-import re
-import numpy as np
-import logging
-
 import nltk
+import tensorflow as tf
+from tokenizers import Tokenizer
+from tqdm import tqdm
+from transformers import GPT2TokenizerFast
 
-from utils import setup_logging
+import jsonl_reader
 
 nltk.download('punkt')
 
@@ -80,23 +75,51 @@ def call_clean_filters(text, args):
 
 
 def create_arxiv_doc(doc, args, encoder, body_shrink_method):
-    text = doc[0]
-    final_encoded = []
-    if doc[1] and text:
-        summary = ''
-        if args.add_abstract:
-            abstract = doc[1]['abstract']
-            summary = call_clean_filters(abstract, args)
-        if args.add_introduction:
-            introduction = doc[1]['introduction']
-            summary = call_clean_filters(introduction, args)
-        body_shrink_method.meta["paper_id"] = doc[1]['paper_id']
-        final_encoded = create_encoded_vector(args, args.chunk_size, args.summary_size, encoder, text, summary,
+    summary = ''
+    general_article = {}
+    if args.summary_section and args.add_summary:
+        summary, general_article = get_sections(args.summary_section, args.add_summary, doc)
+
+    body_shrink_method.meta["paper_id"] = doc['id']
+    final_encoded = create_encoded_vector(args, args.chunk_size, args.summary_size, encoder, general_article, summary,
                                               args.summary_tag, body_shrink_method)
     return final_encoded
 
 
-def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summary, summary_tag, body_shrink_method):
+def get_sections(summary_section, add_summary, doc):
+    summary = ''
+    if add_summary:
+        if summary_section == 'abstract':
+            summary = doc['abstract']
+        elif summary_section in doc['generalized_section_names']:
+            summary_indices = get_indices(summary_section, doc['generalized_section_names'])
+            summary = get_text_for_indices(doc, summary_indices)
+
+    general_article = {}
+    added_sections = []
+    for h in doc['generalized_section_names']:
+        if h != summary_section and h not in added_sections:
+            h_indices = get_indices(h, doc['generalized_section_names'])
+            text = get_text_for_indices(doc, h_indices)
+            added_sections.append(h)
+            general_article[h] = text
+
+    return summary, general_article
+
+
+def get_indices(element, lst):
+    return [i for i in range(len(lst)) if lst[i] == element]
+
+
+def get_text_for_indices(doc, indices):
+    text = ''
+    for i in indices:  # if multiple sections were there to match general section name
+        if i > 0:
+            text = text + doc['article'][doc['section_names'][i]] + ' '
+    return text
+
+
+def create_encoded_vector(args_in, full_size, summary_size, encoder, article, summary, summary_tag, body_shrink_method):
     if args_in is None:
         args_in = args
 
@@ -121,10 +144,9 @@ def create_encoded_vector(args_in, full_size, summary_size, encoder, body, summa
 
     body_size = body_size - size_of_tags
 
-    text = call_clean_filters(body, args_in)
 
     final_encoded = []
-    encoded_body = body_shrink_method.tokenize(args, text, body_size, encoder, args.pad_tag, encoded_pad)
+    encoded_body = body_shrink_method.tokenize(args, article, body_size, encoder, args.pad_tag, encoded_pad)
     if encoded_body:
 
         # start + avg_body
@@ -186,12 +208,8 @@ def split_list(l, n):
 def archive_to_tokens(f, encoder, args, body_shrink_method, prefix=[]):
     # Generator that yields the contents of the files in an archive
     # if data_to_prepend is not None, prepend data_to_prepend + a EOS separator to the encoded data
-    reader = Reader(f)
-    get_meta = False
-    if f.endswith(".jsonl"):
-        get_meta = True
 
-    for doc in reader.stream_data(threaded=False, get_meta=get_meta):
+    for doc in jsonl_reader.read_jsonl(f):
         if args.arxiv_papers:
             doc = create_arxiv_doc(doc, args, encoder, body_shrink_method)
         else:
